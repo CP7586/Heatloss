@@ -1,37 +1,63 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>CP Heat Loss Calculator</title>
-
-    <!-- Your favicon -->
-    <link rel="icon" type="image/png" href="favicon.png">
-
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Heat Loss Calculator</title>
+<style>
+body{margin:0;font:15px "Segoe UI",sans-serif;color:#213c37}
+iframe{display:block;width:100%;height:100vh;border:0}
+dialog{border:1px solid #c7d9ce;border-radius:12px;padding:1.5rem;max-width:420px}
+dialog::backdrop{background:#172e3070}
+button{padding:.6rem .9rem;border:1px solid #8aab9c;border-radius:6px;background:#096d64;color:white;cursor:pointer}
+#cancel{background:white;color:#244b3b}
+#status{color:#526b64}
+</style>
 </head>
-
 <body>
-
-<iframe
-    src="https://script.google.com/macros/s/AKfycbzTueNC7il17mB5Szf7gTM0OTQdzH11Tc51C2uwAspus8f43wZcKborRzPMXL9t0U6FXg/exec"
-    allow="fullscreen">
-</iframe>
-
+<iframe id="app" title="Heat Loss Calculator" src="https://script.google.com/macros/s/AKfycbzTueNC7il17mB5Szf7gTM0OTQdzH11Tc51C2uwAspus8f43wZcKborRzPMXL9t0U6FXg/exec"></iframe>
+<dialog id="saveDialog">
+<h2>Save heat loss PDF</h2>
+<p id="filename"></p>
+<p id="status">Choose where you want to save this PDF.</p>
+<button id="save">Choose location and save</button>
+<button id="cancel">Cancel</button>
+</dialog>
+<script>
+let pending;
+const dialog=document.getElementById("saveDialog");
+const status=document.getElementById("status");
+window.addEventListener("message",event=>{
+ const originURL=new URL(event.origin); const trustedOrigin=originURL.protocol==='https:'&&(originURL.hostname==='script.google.com'||originURL.hostname.endsWith('-script.googleusercontent.com'));
+ if(!trustedOrigin)return;
+ if(event.data?.type==="heatloss-location-check"){
+  event.source.postMessage({type:"heatloss-location-host"},event.origin);
+  return;
+ }
+ if(event.data?.type!=="heatloss-pdf-ready"||typeof event.data.base64!=="string"||typeof event.data.filename!=="string")return;
+ pending={base64:event.data.base64,filename:event.data.filename.replace(/[\/:*?"<>|]/g," ").slice(0,180)};
+ document.getElementById("filename").textContent=pending.filename;
+ status.textContent="Choose where you want to save this PDF.";
+ if(!dialog.open)dialog.showModal();
+});
+document.getElementById("cancel").onclick=()=>{pending=null;dialog.close();};
+document.getElementById("save").onclick=async()=>{
+ if(!pending)return;
+ const button=document.getElementById("save");
+ button.disabled=true;
+ try{
+  if(!window.showSaveFilePicker)throw Error("Open this page in desktop Chrome or Edge to choose a location here.");
+  const file=await window.showSaveFilePicker({suggestedName:pending.filename,types:[{description:"PDF document",accept:{"application/pdf":[".pdf"]}}]});
+  const bytes=Uint8Array.from(atob(pending.base64),c=>c.charCodeAt(0));
+  const writable=await file.createWritable();
+  await writable.write(bytes);
+  await writable.close();
+  pending=null;dialog.close();
+ }catch(error){
+  status.textContent=error.name==="AbortError"?"Save cancelled. Choose a location when you are ready.":error.message;
+ }finally{button.disabled=false;}
+};
+</script>
 </body>
 </html>
+
